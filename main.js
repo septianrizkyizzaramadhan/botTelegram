@@ -18,3 +18,4 @@ function startBot(scriptPath, botName) {
 // Fix: Ganti "botStorage.js" ke "botTele.js"
 startBot(path.join(__dirname, "botTele.js"), "Bot Storage");
 startBot(path.join(__dirname, "gameTele.js"), "Bot Game");
+startBot(path.join(__dirname, "financeTele.js"), "Bot Notes");

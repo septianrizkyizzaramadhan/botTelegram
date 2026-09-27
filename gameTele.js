@@ -3,6 +3,8 @@ const { Bot, InlineKeyboard, InputFile } = require("grammy");
 const fs = require("fs");
 const path = require("path");
 
+const game = require("./game");
+
 const bot = new Bot(process.env.BOT_TOKEN_GAME);
 const TOPIC_GAME_ID = Number(process.env.TOPIC_GAME);
 const DB_FILE = path.join(__dirname, "balances.json");
@@ -76,10 +78,10 @@ function generateChartText(prices) {
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   let chart = "```\n📈 BTC/USDT REAL-TIME MARKET\n-----------------------------------\n";
-  
+
   prices.slice(-6).forEach((price, index) => {
     const bars = Math.round(((price - min) / (max - min || 1)) * 10) + 1;
-    const barStr = "🟩".repeat(bars);
+    const barStr = "█".repeat(bars);
     chart += `T${index + 1}: $${price.toFixed(2)} | ${barStr}\n`;
   });
   chart += "-----------------------------------\n```";
@@ -90,7 +92,7 @@ function generateChartText(prices) {
 setInterval(async () => {
   const deltaPercent = (Math.random() - 0.5) * 0.012;
   currentMarketPrice = Math.round(currentMarketPrice * (1 + deltaPercent));
-  
+
   marketHistory.push(currentMarketPrice);
   if (marketHistory.length > 20) marketHistory.shift();
 
@@ -138,7 +140,7 @@ setInterval(async () => {
 
     if (netProfit <= -pos.margin) {
       shouldClose = true;
-      closeReason = "💥 LIQUIDATED (Margin Hangus)!";
+      closeReason = "💀 LIQUIDATED (Margin Hangus)!";
       netProfit = -pos.margin;
     }
 
@@ -155,7 +157,7 @@ setInterval(async () => {
         await bot.api.editMessageText(
           pos.chatId,
           pos.messageId,
-          `🔔 **POSISI CLOSED: ${closeReason}**\n\n` +
+          `🔄 **POSISI CLOSED: ${closeReason}**\n\n` +
           `• Posisi: **${pos.type}** (Leverage ${pos.leverage}x)\n` +
           `• Margin: **$${pos.margin.toFixed(2)}**\n` +
           `• Entry Price: **$${pos.entryPrice.toFixed(2)}**\n` +
@@ -164,7 +166,7 @@ setInterval(async () => {
           `Total Saldo: **$${balances[userId].toFixed(2)}**`,
           {
             parse_mode: "Markdown",
-            reply_markup: new InlineKeyboard().text("🎮 Menu Utama", "menu_game")
+            reply_markup: new InlineKeyboard().text("🏠 Menu Utama", "menu_game")
           }
         );
       } catch (err) {
@@ -200,20 +202,24 @@ async function getChartImageBuffer(candleData) {
 // ================= HELPER MENU UTAMA =================
 function getMainMenuKeyboard() {
   return new InlineKeyboard()
-    .text("📊 Trading Arena (Real-time)", "menu_trading")
+    .text("📈 Trading Arena (Real-time)", "menu_trading")
     .row()
     .text("🎰 Slot Machine", "info_slot")
     .text("🎯 Lempar Darts", "info_dart")
     .row()
     .text("🎲 Kocok Dadu", "info_dadu")
-    .text("💵 Cek Saldo", "check_balance");
+    .text("💵 Cek Saldo", "check_balance")
+    .row()
+    .text("⚔️ RPG Adventure", "rpg_menu");
 }
 
 function getMainMenuText(userId) {
+  const rpg = game.profile.getProfile(userId);
   return (
     `🎮 **TELEGRAM MINI GAME & TRADING CENTER**\n\n` +
     `• BTC Market Price: **$${currentMarketPrice.toFixed(2)}**\n` +
-    `• Saldo Anda: **$${getBalance(userId).toFixed(2)}**\n\n` +
+    `• Saldo Anda: **$${getBalance(userId).toFixed(2)}**\n` +
+    `• RPG Coin: **${rpg.coin}** | Level: **${rpg.level}**\n\n` +
     `Pilih permainan atau arena trading di bawah:`
   );
 }
@@ -267,10 +273,13 @@ bot.callbackQuery("check_balance", async (ctx) => {
 });
 
 bot.callbackQuery("menu_game", async (ctx) => {
-  await ctx.editMessageText(getMainMenuText(ctx.from.id), {
-    reply_markup: getMainMenuKeyboard(),
-    parse_mode: "Markdown"
-  });
+  try {
+    await ctx.editMessageText(getMainMenuText(ctx.from.id), {
+      reply_markup: getMainMenuKeyboard(),
+      parse_mode: "Markdown"
+    });
+  } catch (e) {}
+  await ctx.answerCallbackQuery().catch(() => {});
 });
 
 // ================= TRADING ARENA HANDLERS =================
@@ -293,8 +302,8 @@ async function renderTradingSetupMenu(ctx) {
   const userId = ctx.from.id;
   const config = userTradingConfigs.get(userId);
 
-  const priceSlPct = config.slPct / config.leverage; 
-  const priceTpPct = config.tpPct / config.leverage; 
+  const priceSlPct = config.slPct / config.leverage;
+  const priceTpPct = config.tpPct / config.leverage;
 
   const longTp = currentMarketPrice * (1 + priceTpPct);
   const longSl = currentMarketPrice * (1 - priceSlPct);
@@ -309,7 +318,7 @@ async function renderTradingSetupMenu(ctx) {
     .text("📈 OPEN LONG (BUY)", "open_LONG")
     .text("📉 OPEN SHORT (SELL)", "open_SHORT")
     .row()
-    .text("🎮 Menu Utama", "menu_game");
+    .text("🏠 Menu Utama", "menu_game");
 
   const caption =
     `🕯️ **CANDLESTICK & REALTIME TRADING**\n\n` +
@@ -334,9 +343,7 @@ async function renderTradingSetupMenu(ctx) {
           parse_mode: "Markdown"
         });
       }
-    } catch (e) {
-      // Mengabaikan error jika konten pesan tidak mengalami perubahan
-    }
+    } catch (e) {}
   } else {
     try {
       const imageBuffer = await getChartImageBuffer(candles);
@@ -362,7 +369,7 @@ bot.callbackQuery("cycle_margin", async (ctx) => {
   const margins = [10, 25, 50, 100, 250, 500];
   const nextIdx = (margins.indexOf(config.margin) + 1) % margins.length;
   config.margin = margins[nextIdx];
-  
+
   await ctx.answerCallbackQuery({ text: `Margin diubah ke $${config.margin}` }).catch(() => {});
   await renderTradingSetupMenu(ctx);
 });
@@ -373,7 +380,7 @@ bot.callbackQuery("cycle_leverage", async (ctx) => {
   const leverages = [1, 5, 10, 20, 50];
   const nextIdx = (leverages.indexOf(config.leverage) + 1) % leverages.length;
   config.leverage = leverages[nextIdx];
-  
+
   await ctx.answerCallbackQuery({ text: `Leverage diubah ke ${config.leverage}x` }).catch(() => {});
   await renderTradingSetupMenu(ctx);
 });
@@ -382,7 +389,7 @@ bot.callbackQuery("toggle_tp", async (ctx) => {
   const userId = ctx.from.id;
   const config = userTradingConfigs.get(userId);
   config.tpPct = config.tpPct === 0.04 ? 0.08 : (config.tpPct === 0.08 ? 0.02 : 0.04);
-  
+
   await ctx.answerCallbackQuery({ text: `Target TP PnL: ${config.tpPct * 100}%` }).catch(() => {});
   await renderTradingSetupMenu(ctx);
 });
@@ -391,7 +398,7 @@ bot.callbackQuery("toggle_sl", async (ctx) => {
   const userId = ctx.from.id;
   const config = userTradingConfigs.get(userId);
   config.slPct = config.slPct === 0.02 ? 0.04 : (config.slPct === 0.04 ? 0.01 : 0.02);
-  
+
   await ctx.answerCallbackQuery({ text: `Target SL PnL: ${config.slPct * 100}%` }).catch(() => {});
   await renderTradingSetupMenu(ctx);
 });
@@ -401,14 +408,14 @@ bot.callbackQuery(/^open_(LONG|SHORT)$/, async (ctx) => {
   const posType = ctx.match[1];
 
   if (activePositions.has(userId)) {
-    return ctx.answerCallbackQuery({ text: "❌ Kamu masih memiliki posisi yang aktif!", show_alert: true });
+    return ctx.answerCallbackQuery({ text: "❗ Kamu masih memiliki posisi yang aktif!", show_alert: true });
   }
 
   const config = userTradingConfigs.get(userId);
   const userCash = getBalance(userId);
 
   if (userCash < config.margin) {
-    return ctx.answerCallbackQuery({ text: `❌ Saldo kurang! Butuh Margin $${config.margin}`, show_alert: true });
+    return ctx.answerCallbackQuery({ text: `❗ Saldo kurang! Butuh Margin $${config.margin}`, show_alert: true });
   }
 
   balances[userId] -= config.margin;
@@ -498,7 +505,7 @@ bot.callbackQuery("manual_close", async (ctx) => {
 
   await ctx.answerCallbackQuery({ text: "Posisi Berhasil Ditutup!" });
 
-  const statusText = netProfit >= 0 ? "🎉 **POSISI DITUTUP (PROFIT)!**" : "📉 **POSISI DITUTUP (RUGI)!**";
+  const statusText = netProfit >= 0 ? "🟢 **POSISI DITUTUP (PROFIT)!**" : "🔻 **POSISI DITUTUP (RUGI)!**";
 
   try {
     await ctx.editMessageText(
@@ -510,7 +517,7 @@ bot.callbackQuery("manual_close", async (ctx) => {
       `Total Saldo: **$${balances[userId].toFixed(2)}**`,
       {
         parse_mode: "Markdown",
-        reply_markup: new InlineKeyboard().text("🎮 Menu Utama", "menu_game")
+        reply_markup: new InlineKeyboard().text("🏠 Menu Utama", "menu_game")
       }
     );
   } catch (e) {}
@@ -528,9 +535,9 @@ function makeBetKeyboard(gameType, currentBet) {
     .text("$100", `setbet_${gameType}_100`)
     .text("🔥 All-In", `setbet_${gameType}_allin`)
     .row()
-    .text(`🚀 SPIN/PUTAR ($${currentBet})`, `start_${gameType}`)
+    .text(`🎲 SPIN/PUTAR ($${currentBet})`, `start_${gameType}`)
     .row()
-    .text("🎮 Kembali Ke Menu", "menu_game");
+    .text("🏠 Kembali Ke Menu", "menu_game");
 }
 
 bot.callbackQuery("info_slot", async (ctx) => {
@@ -588,23 +595,23 @@ bot.callbackQuery("info_dart", async (ctx) => {
 
 bot.callbackQuery(/^setbet_(slot|dadu|dart)_(5|10|25|50|100|allin)$/, async (ctx) => {
   const userId = ctx.from.id;
-  const game = ctx.match[1];
+  const gameType = ctx.match[1];
   const valStr = ctx.match[2];
 
   if (!userBetConfigs.has(userId)) userBetConfigs.set(userId, { slot: 20, dadu: 10, dart: 15 });
   const config = userBetConfigs.get(userId);
 
   if (valStr === "allin") {
-    config[game] = Math.floor(getBalance(userId));
+    config[gameType] = Math.floor(getBalance(userId));
   } else {
-    config[game] = parseInt(valStr);
+    config[gameType] = parseInt(valStr);
   }
 
-  await ctx.answerCallbackQuery({ text: `Taruhan ${game.toUpperCase()} diset ke $${config[game]}` });
+  await ctx.answerCallbackQuery({ text: `Taruhan ${gameType.toUpperCase()} diset ke $${config[gameType]}` });
 
-  if (game === "slot") ctx.api.editMessageReplyMarkup(ctx.chat.id, ctx.callbackQuery.message.message_id, { reply_markup: makeBetKeyboard("slot", config.slot) });
-  if (game === "dadu") ctx.api.editMessageReplyMarkup(ctx.chat.id, ctx.callbackQuery.message.message_id, { reply_markup: makeBetKeyboard("dadu", config.dadu) });
-  if (game === "dart") ctx.api.editMessageReplyMarkup(ctx.chat.id, ctx.callbackQuery.message.message_id, { reply_markup: makeBetKeyboard("dart", config.dart) });
+  if (gameType === "slot") ctx.api.editMessageReplyMarkup(ctx.chat.id, ctx.callbackQuery.message.message_id, { reply_markup: makeBetKeyboard("slot", config.slot) });
+  if (gameType === "dadu") ctx.api.editMessageReplyMarkup(ctx.chat.id, ctx.callbackQuery.message.message_id, { reply_markup: makeBetKeyboard("dadu", config.dadu) });
+  if (gameType === "dart") ctx.api.editMessageReplyMarkup(ctx.chat.id, ctx.callbackQuery.message.message_id, { reply_markup: makeBetKeyboard("dart", config.dart) });
 });
 
 // ================= EKSEKUSI MINI GAMES ANIMASI =================
@@ -616,7 +623,7 @@ bot.callbackQuery("start_slot", async (ctx) => {
   const userCash = getBalance(userId);
 
   if (BET <= 0 || userCash < BET) {
-    return ctx.answerCallbackQuery({ text: `❌ Saldo kurang! Taruhan: $${BET}, Saldo: $${userCash.toFixed(2)}`, show_alert: true });
+    return ctx.answerCallbackQuery({ text: `❗ Saldo kurang! Taruhan: $${BET}, Saldo: $${userCash.toFixed(2)}`, show_alert: true });
   }
 
   balances[userId] -= BET;
@@ -648,7 +655,7 @@ bot.callbackQuery("start_slot", async (ctx) => {
       {
         message_thread_id: TOPIC_GAME_ID,
         parse_mode: "Markdown",
-        reply_markup: new InlineKeyboard().text("🎮 Menu Utama", "menu_game")
+        reply_markup: new InlineKeyboard().text("🏠 Menu Utama", "menu_game")
       }
     );
   }, 3000);
@@ -661,7 +668,7 @@ bot.callbackQuery("start_dadu", async (ctx) => {
   const userCash = getBalance(userId);
 
   if (BET <= 0 || userCash < BET) {
-    return ctx.answerCallbackQuery({ text: `❌ Saldo kurang! Taruhan: $${BET}, Saldo: $${userCash.toFixed(2)}`, show_alert: true });
+    return ctx.answerCallbackQuery({ text: `❗ Saldo kurang! Taruhan: $${BET}, Saldo: $${userCash.toFixed(2)}`, show_alert: true });
   }
 
   balances[userId] -= BET;
@@ -690,7 +697,7 @@ bot.callbackQuery("start_dadu", async (ctx) => {
       {
         message_thread_id: TOPIC_GAME_ID,
         parse_mode: "Markdown",
-        reply_markup: new InlineKeyboard().text("🎮 Menu Utama", "menu_game")
+        reply_markup: new InlineKeyboard().text("🏠 Menu Utama", "menu_game")
       }
     );
   }, 3000);
@@ -703,7 +710,7 @@ bot.callbackQuery("start_dart", async (ctx) => {
   const userCash = getBalance(userId);
 
   if (BET <= 0 || userCash < BET) {
-    return ctx.answerCallbackQuery({ text: `❌ Saldo kurang! Taruhan: $${BET}, Saldo: $${userCash.toFixed(2)}`, show_alert: true });
+    return ctx.answerCallbackQuery({ text: `❗ Saldo kurang! Taruhan: $${BET}, Saldo: $${userCash.toFixed(2)}`, show_alert: true });
   }
 
   balances[userId] -= BET;
@@ -722,7 +729,7 @@ bot.callbackQuery("start_dart", async (ctx) => {
       message = `🎯 **BULLSEYE! TEPAT DI TENGAH!** 🎯\nKamu memenangkan **+$${reward}**!`;
     } else if (score >= 4) {
       reward = BET * 2;
-      message = `✨ **TEMBAKAN BAGUS (Skor: ${score})**\nKamu mendapat **+$${reward}**!`;
+      message = `✔️ **TEMBAKAN BAGUS (Skor: ${score})**\nKamu mendapat **+$${reward}**!`;
     } else {
       message = `❌ **MELESET! (Skor: ${score})**\nKamu kehilangan **-$${BET}**.`;
     }
@@ -735,7 +742,7 @@ bot.callbackQuery("start_dart", async (ctx) => {
       {
         message_thread_id: TOPIC_GAME_ID,
         parse_mode: "Markdown",
-        reply_markup: new InlineKeyboard().text("🎮 Menu Utama", "menu_game")
+        reply_markup: new InlineKeyboard().text("🏠 Menu Utama", "menu_game")
       }
     );
   }, 3000);
@@ -745,6 +752,199 @@ bot.command(["mycash", "mc"], async (ctx) => {
   const cash = getBalance(ctx.from.id);
   await ctx.reply(`💵 Saldo Kamu: **$${cash.toFixed(2)}**`, { parse_mode: "Markdown" });
 });
+
+// ================= RPG ADVENTURE (Mata Uang Terpisah: Coin) =================
+
+bot.callbackQuery("rpg_menu", async (ctx) => {
+  const userId = ctx.from.id;
+  const p = game.profile.getProfile(userId);
+  const status = game.grinding.getGrindingStatus(userId);
+
+  let text =
+    `⚔️ **RPG ADVENTURE**\n\n` +
+    `👤 Level: **${p.level}**\n` +
+    `✨ XP: **${p.xp}/${p.level * 100}**\n` +
+    `💰 Coin: **${p.coin}**\n` +
+    `⚡ Energy: **${p.energy}/${p.maxEnergy}**\n` +
+    `🗡️ ATK: **${p.stats.attack}** | 🛡️ DEF: **${p.stats.defense}**\n`;
+
+  if (status.bossAvailable) {
+    text += `\n👑 **BOSS READY!**\n` +
+            `${status.boss.name}\n` +
+            `⚡ Energy cost: **${status.boss.energyCost}**\n`;
+  } else if (status.cooldownRemaining > 0) {
+    text += `⏳ Cooldown: **${Math.ceil(status.cooldownRemaining / 1000)}s**\n`;
+  } else {
+    text += `✅ Siap grind!\n`;
+  }
+
+  text += `\n_Mata uang RPG (Coin) terpisah dari saldo Trading ($)._`;
+
+  const kb = new InlineKeyboard()
+    .text(status.bossAvailable ? "👑 LAWAN BOSS" : "⚔️ Grind Monster", "rpg_grind")
+    .text("📜 Daily Quest", "rpg_quest")
+    .row()
+    .text("🛒 Shop", "rpg_shop")
+    .text("🎒 Inventory", "rpg_inv")
+    .row()
+    .text("🔄 Refresh", "rpg_menu")
+    .text("🏠 Menu Utama", "menu_game");
+
+  try {
+    await ctx.editMessageText(text, { reply_markup: kb, parse_mode: "Markdown" });
+  } catch (e) {
+    await ctx.reply(text, { message_thread_id: TOPIC_GAME_ID, reply_markup: kb, parse_mode: "Markdown" });
+  }
+  await ctx.answerCallbackQuery().catch(() => {});
+});
+
+bot.callbackQuery("rpg_grind", async (ctx) => {
+  const userId = ctx.from.id;
+  const result = game.grinding.grind(userId);
+
+  if (!result.success) {
+    if (result.type === "cooldown") {
+      return ctx.answerCallbackQuery({
+        text: `⏳ Tunggu ${Math.ceil(result.remaining / 1000)}s lagi!`,
+        show_alert: true
+      });
+    }
+    if (result.type === "energy") {
+      return ctx.answerCallbackQuery({ text: `⚡ ${result.message}`, show_alert: true });
+    }
+  }
+
+  await ctx.answerCallbackQuery({
+    text: result.isBoss ? `BOSS FIGHT!` : `Mengalahkan ${result.monster.name}!`
+  });
+
+  let msg = result.isBoss
+    ? `👑 **BOSS ${result.monster.name} DIKALAHKAN!**\n\n`
+    : `⚔️ **${result.monster.name} dikalahkan!**\n\n`;
+
+  msg += `✨ +${result.xp} XP\n💰 +${result.coin} Coin\n`;
+
+  if (result.droppedItem) msg += `🎁 Drop: **${result.droppedItem}**\n`;
+  if (result.levelUps > 0) msg += `\n🎉 **LEVEL UP! (${result.levelUps}x)**\n`;
+
+  msg += `\n⚡ Energy: ${result.profile.energy}/${result.profile.maxEnergy}\n` +
+         `💰 Coin: ${result.profile.coin}\n` +
+         `📜 Quest kills: ${result.quest.kills}`;
+
+  await ctx.reply(msg, {
+    message_thread_id: TOPIC_GAME_ID,
+    parse_mode: "Markdown",
+    reply_markup: new InlineKeyboard()
+      .text("⚔️ Grind Lagi", "rpg_grind")
+      .text("🏠 RPG Menu", "rpg_menu")
+  });
+});
+
+bot.callbackQuery("rpg_quest", async (ctx) => {
+  const q = game.quest.getQuest(ctx.from.id);
+
+  let text = `📜 **DAILY QUEST**\n\nKills hari ini: **${q.kills}**\n\n`;
+
+  q.milestones.forEach((m) => {
+    const status = m.claimed ? "✅" : (m.reached ? "🎁" : "⏳");
+    text += `${status} **${m.kills} kill** → ${m.coin} Coin + ${m.xp} XP\n`;
+  });
+
+  if (q.allDone) text += `\n🎉 Semua quest hari ini sudah selesai!`;
+
+  const kb = new InlineKeyboard();
+  q.milestones.forEach((m, i) => {
+    if (m.reached && !m.claimed) {
+      kb.text(`🎁 Claim ${m.kills} kill`, `rpg_claim_${i}`).row();
+    }
+  });
+  kb.text("🏠 RPG Menu", "rpg_menu");
+
+  try {
+    await ctx.editMessageText(text, { reply_markup: kb, parse_mode: "Markdown" });
+  } catch (e) {
+    await ctx.reply(text, { message_thread_id: TOPIC_GAME_ID, reply_markup: kb, parse_mode: "Markdown" });
+  }
+  await ctx.answerCallbackQuery().catch(() => {});
+});
+
+bot.callbackQuery(/^rpg_claim_(\d+)$/, async (ctx) => {
+  const idx = parseInt(ctx.match[1]);
+  const res = game.quest.claimQuestReward(ctx.from.id, idx);
+
+  if (!res.success) {
+    return ctx.answerCallbackQuery({ text: res.message, show_alert: true });
+  }
+
+  await ctx.answerCallbackQuery({ text: "Reward diterima!" });
+  await ctx.reply(
+    `🎁 **QUEST REWARD!**\n\n+${res.coin} Coin\n+${res.xp} XP\n${res.levelUps > 0 ? `🎉 Level Up ${res.levelUps}x!` : ""}`,
+    {
+      message_thread_id: TOPIC_GAME_ID,
+      parse_mode: "Markdown",
+      reply_markup: new InlineKeyboard().text("🏠 RPG Menu", "rpg_menu")
+    }
+  );
+});
+
+bot.callbackQuery("rpg_shop", async (ctx) => {
+  const items = game.shop.getShopItems();
+  const p = game.profile.getProfile(ctx.from.id);
+
+  let text = `🛒 **RPG SHOP**\n💰 Coin: ${p.coin}\n\n`;
+  const kb = new InlineKeyboard();
+
+  for (const [id, item] of Object.entries(items)) {
+    text += `• **${item.name}** — ${item.price} coin\n`;
+    kb.text(`${item.name} (${item.price})`, `rpg_buy_${id}`).row();
+  }
+  kb.text("🏠 RPG Menu", "rpg_menu");
+
+  try {
+    await ctx.editMessageText(text, { reply_markup: kb, parse_mode: "Markdown" });
+  } catch (e) {
+    await ctx.reply(text, { message_thread_id: TOPIC_GAME_ID, reply_markup: kb, parse_mode: "Markdown" });
+  }
+  await ctx.answerCallbackQuery().catch(() => {});
+});
+
+bot.callbackQuery(/^rpg_buy_(.+)$/, async (ctx) => {
+  const itemId = ctx.match[1];
+  const res = game.shop.buyItem(ctx.from.id, itemId);
+  if (!res.success) {
+    return ctx.answerCallbackQuery({ text: res.message, show_alert: true });
+  }
+  await ctx.answerCallbackQuery({ text: `Membeli ${res.item.name}!` });
+  await ctx.reply(`✅ Berhasil membeli **${res.item.name}**!`, {
+    message_thread_id: TOPIC_GAME_ID,
+    parse_mode: "Markdown",
+    reply_markup: new InlineKeyboard().text("🏠 RPG Menu", "rpg_menu")
+  });
+});
+
+bot.callbackQuery("rpg_inv", async (ctx) => {
+  const inv = game.inventory.getInventory(ctx.from.id);
+  let text = `🎒 **INVENTORY**\n\n`;
+
+  const entries = Object.entries(inv.inventory).filter(([_, n]) => n > 0);
+  if (entries.length === 0) text += "_Kosong_\n";
+  else entries.forEach(([id, n]) => { text += `• ${id}: **${n}**\n`; });
+
+  text += `\n🗡️ Weapon: **${inv.equipment.weapon}**\n`;
+  text += `🛡️ Armor: **${inv.equipment.armor}**\n`;
+  text += `🎒 Bag Slots: **${inv.bagSlots}**`;
+
+  const kb = new InlineKeyboard().text("🏠 RPG Menu", "rpg_menu");
+
+  try {
+    await ctx.editMessageText(text, { reply_markup: kb, parse_mode: "Markdown" });
+  } catch (e) {
+    await ctx.reply(text, { message_thread_id: TOPIC_GAME_ID, reply_markup: kb, parse_mode: "Markdown" });
+  }
+  await ctx.answerCallbackQuery().catch(() => {});
+});
+
+// ================= ERROR HANDLER =================
 
 bot.catch((err) => {
   console.error("Grammy Error:", err.error);

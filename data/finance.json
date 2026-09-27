@@ -1,0 +1,22 @@
+{
+  "6342030147": {
+    "transactions": [
+      {
+        "id": "1790502663318",
+        "type": "income",
+        "amount": 20000,
+        "category": "Pemasukan",
+        "note": "uangSaku",
+        "date": "2026-09-27T09:51:03.318Z"
+      },
+      {
+        "id": "1790505201512",
+        "type": "income",
+        "amount": 20000,
+        "category": "Pemasukan",
+        "note": "uangSaku",
+        "date": "2026-09-27T10:33:21.512Z"
+      }
+    ]
+  }
+}

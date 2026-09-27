@@ -1,0 +1,37 @@
+{
+  "6342030147": {
+    "level": 6,
+    "xp": 375,
+    "coin": 1289,
+    "energy": 29,
+    "maxEnergy": 30,
+    "stats": {
+      "attack": 21,
+      "defense": 8
+    },
+    "inventory": {
+      "slime_core": 3,
+      "goblin_ear": 3,
+      "wolf_fang": 4,
+      "orc_tooth": 0,
+      "dragon_scale": 0,
+      "small_potion": 0,
+      "xp_potion": 0
+    },
+    "equipment": {
+      "weapon": "iron_sword",
+      "armor": "cloth_armor"
+    },
+    "bagSlots": 25,
+    "quest": {
+      "date": "2026-09-27",
+      "kills": 25,
+      "rewardClaimed": true,
+      "claimed": [
+        0,
+        1
+      ]
+    },
+    "lastGrind": 1790489592974
+  }
+}
