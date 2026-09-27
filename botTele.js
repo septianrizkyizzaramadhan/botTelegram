@@ -1,70 +1,159 @@
-require("dotenv").config();
 const { Bot } = require("grammy");
+const config = require("./config/config");
 
+// ================= CONFIG =================
 
-const bot = new Bot(process.env.BOT_TOKEN_PENYIMPANAN);
+const bot = new Bot(config.bots.storage.token);
 
-const TOPIC_UPLOAD = Number(process.env.TOPIC_UPLOAD);
-const TOPIC_PDF = Number(process.env.TOPIC_PDF);
-const TOPIC_IMG = Number(process.env.TOPIC_IMG);
-const TOPIC_MP4 = Number(process.env.TOPIC_VIDEO);
+const {
+  upload: TOPIC_UPLOAD,
+  pdf: TOPIC_PDF,
+  image: TOPIC_IMG,
+  video: TOPIC_VIDEO,
+} = config.topics;
 
+// ================= MESSAGE HANDLER =================
 
 bot.on("message", async (ctx) => {
   const msg = ctx.message;
 
-  // Debug 1: Cek apakah ada pesan masuk & berapa thread_id nya
-  console.log("--- PESAN MASUK ---");
-  console.log("Pesan berasal dari Thread ID:", msg.message_thread_id);
-  console.log("ID Topik Upload yang dicari:", TOPIC_UPLOAD);
+  console.log("\n--- PESAN MASUK ---");
+  console.log("Thread ID:", msg.message_thread_id);
+  console.log("Upload Topic:", TOPIC_UPLOAD);
 
-  // Cek apakah pesan ada di topik Upload
-  if (msg.message_thread_id === TOPIC_UPLOAD) {
-    console.log("-> Pesan VALID di topik Upload!");
+  // ================= CEK TOPIC =================
 
-    let targetTopicId = null;
+  if (msg.message_thread_id !== TOPIC_UPLOAD) {
+    console.log("-> Pesan diabaikan: bukan topic Upload.");
+    return;
+  }
 
-    if (msg.document) {
-      console.log("-> Tipe file: Dokumen (MIME:", msg.document.mime_type, ")");
-      targetTopicId = TOPIC_PDF;
-    }
+  console.log("-> Pesan VALID di topic Upload!");
 
-    else if (msg.photo) {
-        console.log('->Tipe file: Foto (Total resolusi yang tersedia:', msg.photo.length, ')');
-        targetTopicId = TOPIC_IMG;
-    }
+  let targetTopicId = null;
+  let fileType = null;
 
-    else if (msg.mp4) {
-        console.log('-> Tipe file: Mp4 (MIME:', msg.mp4.mime_type, ')');
-        targetTopicId = TOPIC_MP4
-    }
+  // ================= VIDEO =================
 
-    if (targetTopicId) {
-      try {
-        await ctx.api.copyMessage(
-          ctx.chat.id,
-          ctx.chat.id,
-          msg.message_id,
-          { message_thread_id: targetTopicId }
-        );
+  if (msg.video) {
+    fileType = "Video";
+    targetTopicId = TOPIC_VIDEO;
 
-        const replyBot = await ctx.reply(
-            `Berhail upload ke topic **${targetTopicId}**!`,
-            {
-                reply_parameters : {message_id: msg.message_id},
-                parse_mode: 'Markdown'
-            }
-        )
+    console.log("-> Tipe: Video");
+    console.log(
+      "-> MIME:",
+      msg.video.mime_type || "tidak diketahui"
+    );
+  }
 
-        console.log(`[BERHASIL] File disalin ke topik ID: ${targetTopicId}`);
-      } catch (error) {
-        console.error("[ERROR API Telegram]:", error.message);
+  // ================= MP4 SEBAGAI DOCUMENT =================
+
+  else if (
+    msg.document &&
+    msg.document.mime_type === "video/mp4"
+  ) {
+    fileType = "Video MP4";
+    targetTopicId = TOPIC_VIDEO;
+
+    console.log("-> Tipe: Video MP4 sebagai Document");
+    console.log("-> MIME:", msg.document.mime_type);
+  }
+
+  // ================= FOTO =================
+
+  else if (msg.photo) {
+    fileType = "Foto";
+    targetTopicId = TOPIC_IMG;
+
+    console.log("-> Tipe: Foto");
+    console.log("-> Jumlah resolusi:", msg.photo.length);
+  }
+
+  // ================= DOCUMENT =================
+
+  else if (msg.document) {
+    fileType = "Dokumen";
+    targetTopicId = TOPIC_PDF;
+
+    console.log("-> Tipe: Dokumen");
+    console.log(
+      "-> MIME:",
+      msg.document.mime_type || "tidak diketahui"
+    );
+  }
+
+  // ================= TIDAK DIDUKUNG =================
+
+  else {
+    console.log("-> Tipe pesan tidak didukung.");
+    return;
+  }
+
+  // ================= VALIDASI TARGET =================
+
+  if (!targetTopicId) {
+    console.error(
+      `-> Target topic untuk ${fileType} tidak ditemukan.`
+    );
+    return;
+  }
+
+  // ================= COPY MESSAGE =================
+
+  try {
+    console.log(
+      `-> Menyalin ${fileType} ke topic ${targetTopicId}...`
+    );
+
+    await ctx.api.copyMessage(
+      ctx.chat.id,
+      ctx.chat.id,
+      msg.message_id,
+      {
+        message_thread_id: targetTopicId,
       }
-    }
-  } else {
-    console.log("-> Pesan diabaikan karena bukan di topik Upload.");
+    );
+
+    // ================= REPLY =================
+
+    await ctx.reply(
+      `Berhasil upload ${fileType} ke topic!`,
+      {
+        reply_parameters: {
+          message_id: msg.message_id,
+        },
+      }
+    );
+
+    console.log(
+      `[BERHASIL] ${fileType} → Topic ${targetTopicId}`
+    );
+
+  } catch (error) {
+    console.error(
+      "[ERROR API TELEGRAM]:",
+      error.message
+    );
   }
 });
 
-console.log("Bot berjalan...");
-bot.start();
+// ================= GLOBAL ERROR HANDLER =================
+
+bot.catch((err) => {
+  console.error(
+    "❌ Grammy Error:",
+    err.error
+  );
+});
+
+// ================= START =================
+
+console.log("Bot penyimpanan berjalan...");
+
+bot.start({
+  onStart: (botInfo) => {
+    console.log(
+      `✅ Bot aktif sebagai @${botInfo.username}`
+    );
+  },
+});
