@@ -41,6 +41,9 @@ module.exports = {
     image: requiredNumber("TOPIC_IMG"),
     video: requiredNumber("TOPIC_VIDEO"),
     game: requiredNumber("TOPIC_GAME"),
+    audio: requiredNumber("TOPIC_AUDIO"),
+    doc: requiredNumber("TOPIC_DOC"),
+    archive: requiredNumber("TOPIC_ARCHIVE")
   },
 
   database: {

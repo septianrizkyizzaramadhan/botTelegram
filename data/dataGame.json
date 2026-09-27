@@ -1,37 +1,39 @@
 {
   "6342030147": {
-    "level": 6,
-    "xp": 375,
-    "coin": 1289,
-    "energy": 29,
-    "maxEnergy": 30,
+    "level": 13,
+    "xp": 383,
+    "coin": 8297,
+    "energy": 43,
+    "maxEnergy": 44,
     "stats": {
-      "attack": 21,
-      "defense": 8
+      "attack": 35,
+      "defense": 15
     },
     "inventory": {
       "slime_core": 3,
       "goblin_ear": 3,
-      "wolf_fang": 4,
-      "orc_tooth": 0,
+      "wolf_fang": 6,
+      "orc_tooth": 1,
       "dragon_scale": 0,
       "small_potion": 0,
-      "xp_potion": 0
+      "xp_potion": 0,
+      "goblin_crown": 1
     },
     "equipment": {
       "weapon": "iron_sword",
       "armor": "cloth_armor"
     },
-    "bagSlots": 25,
+    "bagSlots": 30,
     "quest": {
       "date": "2026-09-27",
-      "kills": 25,
+      "kills": 60,
       "rewardClaimed": true,
       "claimed": [
         0,
-        1
+        1,
+        2
       ]
     },
-    "lastGrind": 1790489592974
+    "lastGrind": 1790515420383
   }
 }
