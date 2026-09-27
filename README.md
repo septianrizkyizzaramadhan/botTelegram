@@ -25,14 +25,14 @@ Bot buat ngerapihin file yang masuk ke grup.
 
 Bot hiburan + trading simulator dalam satu topik.
 
-** Real-Time Trading**
+**Real-Time Trading**
 - Simulasi harga BTC/USDT yang gerak terus tiap 2 detik
 - Candlestick chart real-time via QuickChart API
 - Bisa Open **LONG** / **SHORT**
 - Setting margin, leverage (sampai 50x), Stop Loss, Take Profit
 - PnL dihitung otomatis, kena liquidation? ya hangus
 
-** Mini Games**
+**Mini Games**
 -  **Slot Machine** — jackpot triple 777 (10x), triple match (3x)
 -  **Dice Roller** — angka 4-6 menang, 2.5x
 -  **Darts Arena** — bullseye 5x, skor 4-5 dapat 2x
